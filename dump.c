@@ -3,8 +3,6 @@
 #include <math.h>
 #include <time.h>
 
-/* 2 GiB */
-// #define FILE_SIZE_BYTES 2000000000
 #define FILE_SIZE_BYTES 1024
 #define NUM_LINES 250000000
 #define LINE_LENGTH_BYTES 80
