@@ -17,7 +17,6 @@
 
 #define FILENAME "dump_out.txt"
 #define BUF_BYTES 1024
-#define OFFSET 2048
 
 struct termios termios_before;
 
@@ -44,13 +43,11 @@ int
 main()
 {
     FILE *f = fopen(FILENAME, "rb+");
-    fseek(f, OFFSET, SEEK_CUR);
+
     char buf[BUF_BYTES+1];
     buf[BUF_BYTES] = '\0';
-
     size_t bytes_read = fread(buf, sizeof(char), BUF_BYTES, f);
-    printf("read: %zu\n", bytes_read);
-    printf("%s\n", buf);
+    printf("%s", buf);
 
     enable_raw();
 
@@ -62,6 +59,12 @@ main()
 	    goto end;
 	case 'q':
 	    goto end;
+	case 'j': {
+	    /* load the next "page" */
+	    size_t bytes_read = fread(buf, sizeof(char), BUF_BYTES, f);
+	    printf("%s", buf);
+	    break;
+	}
 	default:
 	    printf("%d", c);
 	}
