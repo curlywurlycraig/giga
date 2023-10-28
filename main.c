@@ -16,6 +16,9 @@
   TODO Accept an argument for which file to edit
   TODO Error handling
   TODO Don't hard code term width and height
+  TODO Handle wrapping (e.g. what about very long documents with no line breaks?)
+  TODO There is probably a nicer way of handling how buffers and pages interact
+  This can be done by making an abstraction that allows to read buffer regions transparently
 */
 
 #define FILENAME "dump_out.txt"
@@ -72,7 +75,7 @@ page_free(Page* p)
 typedef struct {
     int cursor_x;
     int cursor_y;
-    long cursor_text_index;
+    long cursor_text_index; // this is the index in the entire file bytes
     long view_offset;
     FILE *f;
     Page *curr_page;
@@ -125,6 +128,14 @@ buffer_close(Buffer *b)
 void
 buffer_cursor_down(Buffer *b)
 {
+    // find the next newline, or TERM_WIDTH, whichever comes first
+    int search_idx = b->cursor_text_index;
+    while (b->curr_page[search_idx-b->curr_page->offset] != '\n' &&
+	search_idx-b->curr_page->offset < TERM_WIDTH) {
+	search_idx++;
+    }
+
+    // Find out where the next index will be
     write(STDOUT_FILENO, "\x1b[B", 3);
     b->cursor_y++;
 }
@@ -135,6 +146,29 @@ buffer_cursor_up(Buffer *b)
     write(STDOUT_FILENO, "\x1b[A", 3);
     b->cursor_y++;
 }
+
+void
+buffer_cursor_left(Buffer *b)
+{
+    b->cursor_x--;
+    if (b->cursor_x < 0 && b->cursor_y == 0) {
+	return;
+    } else if (b->cursor_x < 0) {
+	b->cursor_y--;
+    }
+    b->cursor_text_index--;
+
+    write(STDOUT_FILENO, "\x1b[D", 3);
+    b->cursor_x--;
+}
+
+void
+buffer_cursor_right(Buffer *b)
+{
+    write(STDOUT_FILENO, "\x1b[C", 3);
+    b->cursor_x++;
+}
+
 
 void
 buffer_jump_to_middle(Buffer *b)
@@ -174,12 +208,6 @@ buffer_jump_to_start(Buffer *b)
 
 
 /*
-
-  On load:
-  load 1 page, offset 0.
-  Cursor at 0, 0.
-  Render the page.
-  
   When navigating the cursor:
   cursor down:
     find the next newline character
@@ -187,7 +215,8 @@ buffer_jump_to_start(Buffer *b)
     update cursor Y (+1)
     maintain cursor X
     
-if the cursor moves off screen, advance the byte offset to just after the first newline character found from the current offset.
+if the cursor moves off screen, advance the byte offset to just after
+the first newline character found from the current offset.
 
 In the future, decouple page loads from current buffer offset
 
@@ -214,6 +243,12 @@ main()
 	    break;
 	case 'k':
 	    buffer_cursor_up(b);
+	    break;
+	case 'h':
+	    buffer_cursor_left(b);
+	    break;
+	case 'l':
+	    buffer_cursor_right(b);
 	    break;
 	case 'L':
 	    buffer_jump_to_middle(b);
